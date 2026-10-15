@@ -1,0 +1,504 @@
+That is a reasonable direction. Your guide’s preference gives us a usable research domain, while the earlier assessment gives us a way to avoid building another generic “biased/unbiased news classifier.”
+
+The field should be fixed as:
+
+Bias detection in news and media
+
+But the technical problem should be narrowed to:
+
+Editorial Transformation Provenance
+
+Detect, classify, and attribute framing changes introduced when a common source record is transformed into a headline, quotation, summary, caption, or published news article.
+
+This is different from predicting whether an outlet is left, centre, or right.
+
+Why generic media-bias detection should be excluded
+
+Existing systems already analyze:
+
+Political lean
+Tone
+Topic selection
+Sentence-level framing
+Publisher-level patterns
+Quotes
+Event clusters
+Headline faithfulness
+Text-image relationships
+Multimodal bias
+
+The published Media Bias Detector performs sentence-, article-, and publisher-level analysis of selection and framing bias. Its annotations include political lean, tone, topics, article type, events, quotes, and sentence focus.
+
+The MediaSpin Dataset contains 78,910 pairs of headlines edited after publication and annotations covering 13 bias categories, including sensationalism, spin, omission, and slant.
+
+FIFO evaluates framing in machine-generated news summaries using jury-annotated and expert-labelled examples. This means summary-level framing and omission are also active research areas.
+
+Therefore, our research should not be:
+
+Input: one article
+Output: biased or unbiased
+
+
+It should instead be:
+
+Input:
+Authoritative or common source record
++
+One or more published transformations
+
+Output:
+Which information was preserved, omitted, weakened, strengthened,
+reordered, selectively quoted, misattributed, or reframed
+
+Recommended research scope
+Primary mechanism
+Claim-aligned editorial transformation graph
+
+The method receives:
+
+Official statement, transcript, press release, judgment, report, or event record
+Published article
+Article headline
+Quotations used in the article
+Optional caption or social-media preview
+
+It constructs a graph linking source claims to published transformations.
+
+Graph nodes
+SOURCE_CLAIM
+SOURCE_QUALIFICATION
+SOURCE_EVIDENCE
+SOURCE_QUOTE
+ARTICLE_CLAIM
+ARTICLE_QUOTE
+HEADLINE_CLAIM
+CAPTION_CLAIM
+ENTITY
+EVENT
+
+Graph edges
+PRESERVED
+PARAPHRASED
+OMITTED
+STRENGTHENED
+WEAKENED
+REORDERED
+ATTRIBUTION_CHANGED
+QUALIFICATION_REMOVED
+CONTEXT_REMOVED
+CONTRADICTED
+UNSUPPORTED
+SPLIT
+MERGED
+
+
+The output is not an ideological label. It is a typed record of editorial changes.
+
+Quote-context integrity should be the first subproblem
+
+This is narrower and easier to validate than general framing.
+
+Input
+Full speech, interview, judgment, report, or press-conference transcript
++
+Quotation used in a published article
++
+Article sentence surrounding the quotation
+
+Questions answered
+Does the quotation exist in the source?
+Was it modified?
+Was text removed from the middle?
+Was the speaker represented correctly?
+Was a qualification omitted?
+Was a negation omitted?
+Was a correction or clarification omitted?
+Did the article’s interpretation follow from the original context?
+Was the quotation moved from one subject to another?
+Is the retrieved source span sufficiently certain?
+Proposed computational pipeline
+SOURCE DOCUMENT
+      ↓
+Document segmentation
+      ↓
+Claim, quote, entity and discourse extraction
+      ↓
+ARTICLE + HEADLINE
+      ↓
+Candidate source-span retrieval
+      ↓
+Monotonic and non-monotonic span alignment
+      ↓
+Entailment and semantic-strength comparison
+      ↓
+Qualification / negation / correction detection
+      ↓
+Editorial transformation graph
+      ↓
+Transformation confidence and evidence
+      ↓
+Report or abstention
+
+Computer-science contribution
+1. Hierarchical source alignment
+
+Article sentences should not be matched through embedding similarity alone.
+
+Use three stages:
+
+Candidate retrieval
+BM25
+E5-small
+MiniLM
+TF-IDF baseline
+Span alignment
+Dynamic programming
+Smith-Waterman-style local alignment
+Bipartite matching
+Sequence-constrained alignment
+Semantic verification
+Natural language inference
+Semantic textual similarity
+Contradiction detection
+Source-order consistency
+
+The alignment layer is necessary because one article sentence may combine several source sentences, while one source claim may be distributed across multiple article sentences.
+
+2. Discourse-aware context model
+
+The model should explicitly identify:
+
+NEGATION
+QUALIFICATION
+CONDITION
+UNCERTAINTY
+CORRECTION
+CONCESSION
+CAUSAL_EXPLANATION
+TEMPORAL_LIMIT
+SOURCE_ATTRIBUTION
+
+
+Example:
+
+Source:
+“We do not expect prices to fall immediately, although the policy
+may reduce inflation over the next two quarters.”
+
+Headline:
+“Policy will reduce prices.”
+
+
+The important transformation is not ordinary text difference. It includes:
+
+Removal of negation
+Removal of timing
+Change from uncertainty to certainty
+Change from inflation to prices
+
+A generic sentiment classifier will not capture this reliably.
+
+3. Signed semantic-strength transformation
+
+The method needs to identify direction.
+
+Examples:
+
+may → will                strengthening
+some → all                strengthening
+associated with → causes  strengthening
+likely → confirmed        strengthening
+will → may                weakening
+all → some                weakening
+
+
+A candidate semantic-strength value can be defined as:
+
+ΔS=Spublished−Ssource\Delta S = S_{\text{published}} - S_{\text{source}}
+
+The model must retain the sign:
+
+Positive: strengthened claim
+Negative: weakened claim
+Zero: approximately preserved
+
+
+The ordering should be learned or constrained separately for:
+
+Modality
+Quantification
+Causality
+Certainty
+Attribution
+Temporal extent
+4. Context-loss score
+
+For a quotation qq, investigate:
+
+CLS(q)=wnNq+wmMq+wcCq+waAq+wtTqCLS(q)= w_nN_q+ w_mM_q+ w_cC_q+ w_aA_q+ w_tT_q
+
+Where:
+
+NqN_q: negation loss
+MqM_q: modality or qualification loss
+CqC_q: correction or concession loss
+AqA_q: attribution inconsistency
+TqT_q: temporal-context loss
+
+This should not be introduced as the invention until experiments establish:
+
+Which terms are necessary
+How weights are estimated
+Whether the score generalizes
+Whether a simpler baseline performs equally well
+5. Transformation provenance rather than one bias score
+
+The output should look like:
+
+Transformation ID: TR-0024
+
+Source:
+“The preliminary survey suggests that some districts may require
+additional assistance.”
+
+Published:
+“Districts require additional assistance.”
+
+Transformations:
+- PRELIMINARY STATUS REMOVED
+- QUANTIFIER “SOME” REMOVED
+- MODALITY “MAY” REMOVED
+- CLAIM STRENGTHENED
+
+Evidence confidence: 0.91
+Transformation confidence: 0.84
+Bias conclusion: WITHHELD
+Human interpretation required: YES
+
+
+The system detects measurable transformations. It does not declare the journalist or publisher biased.
+
+This boundary is important for scientific validity and fairness.
+
+Model design
+Baseline models
+TF-IDF cosine similarity
+BM25 source-span retrieval
+Sentence-BERT similarity
+Standard natural-language-inference model
+LLM direct classification
+Proposed graph-and-alignment method
+Proposed architecture
+
+A reasonable research architecture is:
+
+Source encoder
+Article encoder
+      ↓
+Cross-document alignment matrix
+      ↓
+Claim-pair encoder
+      ↓
+Discourse feature branch
+      +
+Semantic-strength branch
+      +
+Quote-integrity branch
+      ↓
+Typed transformation classifier
+      ↓
+Transformation graph
+
+CPU-compatible model choices
+sentence-transformers/all-MiniLM-L6-v2
+intfloat/e5-small-v2
+DistilRoBERTa
+DeBERTa-v3-small, if memory permits
+Logistic Regression
+LightGBM or HistGradientBoosting
+NetworkX for graph representation
+
+Large LLMs are unnecessary for the main experiments.
+
+Model parameters to investigate
+Source chunk length: 1–5 sentences
+Context window: 1–4 sentences before and after quotation
+Retrieval top-k: 5, 10, 20
+Embedding similarity threshold
+NLI entailment threshold
+NLI contradiction threshold
+Alignment gap penalty
+Claim-merge penalty
+Claim-split penalty
+Semantic-strength margin
+Transformation-confidence threshold
+Abstention threshold
+Graph-edge creation threshold
+Minimum evidence coverage
+
+
+All thresholds must be selected using development data only.
+
+Dataset strategy
+
+Use three dataset layers.
+
+Layer 1: Controlled synthetic transformations
+
+Start from verified source text and programmatically apply:
+
+Negation removal
+Modality strengthening
+Quantifier change
+Attribution removal
+Sentence reordering
+Qualification deletion
+Selective quotation
+Correction deletion
+
+This establishes exact transformation ground truth.
+
+Synthetic examples must remain separate from real-media evaluation.
+
+Layer 2: Existing media datasets
+
+NewsMediaBias-Plus includes more than 40,000 text-image samples with media-bias annotations and metadata. It can be used for external comparison, but it is not sufficient for source-to-publication provenance because the dataset is designed primarily around bias-labelled media content.
+
+MediaSpin is particularly relevant for evaluating editorial transformations because it contains before-and-after headline revisions.
+
+Layer 3: Manually aligned source-article corpus
+
+Create a smaller high-quality corpus containing:
+
+Official source
+Published article
+Headline
+Claims
+Quotes
+Source spans
+Transformation labels
+Annotator agreement
+
+
+Prefer sources with clear provenance:
+
+Court judgments and reporting
+Government press releases and reporting
+Parliamentary or legislative transcripts and reporting
+Company regulatory filings and reporting
+Public speeches and reporting
+Research-paper abstracts and news reporting
+
+Avoid beginning with political-left versus political-right labels.
+
+Validation
+Split by event
+
+Articles covering the same event cannot appear across training and test sets.
+
+Split by publisher
+
+Hold out publishers to test whether the method learned transformations rather than publisher identity.
+
+Split by source type
+
+Train on statements and transcripts, then test separately on reports or judgments.
+
+Split by transformation
+
+Hold out one transformation category to test unknown-operation rejection.
+
+Metrics
+Retrieval
+Recall@k
+Mean reciprocal rank
+Source-span overlap
+Alignment
+Claim-pair precision
+Claim-pair recall
+Exact or partial span match
+Transformation classification
+Macro F1
+Per-transformation recall
+Confusion matrix
+Calibration
+Expected calibration error
+Brier score
+Reliability diagrams
+Abstention
+Risk-coverage curve
+Incorrect high-confidence transformation rate
+Unknown-transformation rejection
+Graph quality
+Edge precision
+Edge recall
+Dangling-edge rate
+Unsupported transformation rate
+Patent position
+Broad media-bias detection
+
+Rating: D
+
+The field already has mature datasets, classifiers, graph approaches, multimodal approaches, LLM-based frameworks, and interactive tools.
+
+Source-to-publication transformation provenance
+
+Preliminary rating: B/C
+
+The mechanism is more technically defined, but a full claims-level search is still required.
+
+Quote-context integrity
+
+Preliminary rating: B
+
+This is the best first embodiment because it has:
+
+Defined inputs
+Reproducible ground truth
+Measurable alignment quality
+Typed transformations
+A concrete computational sequence
+Practical CPU requirements
+A clear abstention mechanism
+Potential claim focus
+
+Not:
+
+“A system for detecting bias in news.”
+
+Potentially:
+
+A computer-implemented method for aligning published claims or quotations with source-document spans, detecting signed semantic-strength and discourse-context transformations, constructing a typed editorial-transformation graph, and withholding a transformation determination when source alignment or contextual evidence fails a defined confidence condition.
+
+That wording is only a research description, not a drafted patent claim.
+
+Recommended direction
+
+Use the broad field your guide prefers:
+
+Bias detection in news and media
+
+
+Use this research problem:
+
+Editorial transformation provenance
+
+
+Use this first technical embodiment:
+
+Quote-context distortion and semantic-strength change
+
+
+Then extend it to:
+
+Headline transformation
+Claim omission
+Prominence and reordering
+Source attribution
+Cross-publisher event comparison
+
+
+This preserves the media-bias theme while giving us a narrower mechanism to investigate for patentability. The immediate next document should be a confidential problem–prior-art–mechanism matrix covering claim alignment, quotation verification, discourse-context loss, semantic-strength change, and transformation graphs.
+
+
+I like the recommended research scope. I have a problem tho. I need to hand over my laptop now to fix the screen and I do not want to lose this chat. Give me a hand off zip folder containing eveything i will need to know about this current recommended research scope. Give the contents in this zip folder as a text file. Also include in the folder the prompts to use to achieve this with another chat/LLM. give the prompts or explanations in asd ste-100 but at 75% temperature. Give me the step by step implementation and guidelines, the rules, the limits, etc. Give me the problem prior art mechanism matrix document as well. Offer other Scopes as well in this field. Maybe something related to journal/conference publishing and less patent worthy. Give me everything related to this research domain. Take your time. Think. Cross refer with external sources. In the zip folder give the sources. 
